@@ -1,0 +1,276 @@
+// Prisma Schema for FarmDirect
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String
+  role          String         // farmer | buyer | hub_admin
+  phone         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  farmerProfile FarmerProfile?
+  buyerProfile  BuyerProfile?
+  listings      Listing[]
+  orders        Order[]        @relation("BuyerOrders")
+  ratingsGiven  Rating[]       @relation("RatingAuthor")
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model FarmerProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique @map("user_id")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  village           String
+  pincode           String
+  district          String?
+  state             String?
+  bankAccountNumber String?
+  ifscCode          String?
+  upiId             String?
+  preferredLanguage String   @default("en") // en | hi | mr | ta | te | kn
+  aadhaarOptional   String?
+  verified          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  ratingsReceived   Rating[] @relation("FarmerRatings")
+
+  @@map("farmer_profiles")
+}
+
+model BuyerProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  buyerType   String   @default("INDIVIDUAL") // INDIVIDUAL | BULK_FPO
+  orgName     String?
+  gstin       String?
+  addressLine String?
+  city        String?
+  state       String?
+  pincode     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("buyer_profiles")
+}
+
+model OtpCode {
+  id         String    @id @default(uuid())
+  email      String
+  codeHash   String    @map("code_hash")
+  purpose    String    @default("login") // login | signup
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
+  @@map("otp_codes")
+}
+
+model Crop {
+  id                  String               @id @default(uuid())
+  name                String               @unique
+  category            String               // Vegetables | Fruits | Grains | Pulses | Spices
+  unit                String               @default("kg") // kg | quintal
+  iconUrl             String?
+  description         String?
+  basePricePerKg      Float                @default(20.0)
+  createdAt           DateTime             @default(now())
+
+  threshold           CropThreshold?
+  listings            Listing[]
+  mandiPrices         MandiReferencePrice[]
+
+  @@map("crops")
+}
+
+model CropThreshold {
+  id                         String   @id @default(uuid())
+  cropId                     String   @unique @map("crop_id")
+  crop                       Crop     @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  quintalEquivalentThreshold Float    @default(0.5) @map("quintal_equivalent_threshold") // Threshold in quintals (e.g. 0.5 = 50kg)
+  commissionPercentage       Float    @default(5.0) @map("commission_percentage")
+  updatedAt                  DateTime @updatedAt
+
+  @@map("crop_thresholds")
+}
+
+model Listing {
+  id            String    @id @default(uuid())
+  farmerId      String    @map("farmer_id")
+  farmer        User      @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  cropId        String    @map("crop_id")
+  crop          Crop      @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  quantity      Float     // Available quantity
+  unit          String    @default("kg") // kg | quintal
+  pricePerUnit  Float     @map("price_per_unit")
+  harvestDate   DateTime  @map("harvest_date")
+  aiGrade       String    @default("A") @map("ai_grade") // A | B | C
+  aiConfidence  Float     @default(0.92) @map("ai_confidence")
+  aiTips        String?   @map("ai_tips")
+  status        String    @default("ACTIVE") // ACTIVE | PAUSED | SOLD_OUT
+  photos        String    // JSON string of photo URLs
+  notes         String?
+  farmLocation  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders        Order[]
+
+  @@index([farmerId])
+  @@index([cropId])
+  @@map("listings")
+}
+
+model MandiReferencePrice {
+  id           String   @id @default(uuid())
+  cropId       String   @map("crop_id")
+  crop         Crop     @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  region       String   // e.g. "Nashik APMC", "Azadpur Mandi", "Vashi APMC"
+  state        String
+  minPrice     Float    @map("min_price")
+  maxPrice     Float    @map("max_price")
+  modalPrice   Float    @map("modal_price") // Benchmark market price per kg
+  reportedDate DateTime @default(now()) @map("reported_date")
+
+  @@index([cropId])
+  @@map("mandi_reference_prices")
+}
+
+model Order {
+  id                   String              @id @default(uuid())
+  buyerId              String              @map("buyer_id")
+  buyer                User                @relation("BuyerOrders", fields: [buyerId], references: [id])
+  listingId            String              @map("listing_id")
+  listing              Listing             @relation(fields: [listingId], references: [id])
+  quantity             Float
+  unit                 String              @default("kg")
+  unitPrice            Float               @map("unit_price")
+  totalAmount          Float               @map("total_amount")
+  commissionAmount     Float               @map("commission_amount")
+  deliveryType         String              @map("delivery_type") // FARM_DIRECT | HUB_CONSOLIDATED
+  status               String              @default("PLACED") 
+  // Status flow: PLACED -> ESCROW_HELD -> HUB_VERIFIED -> DISPATCHED -> DELIVERED -> COMPLETED / DISPUTED
+  deliveryAddress      String?
+  deliveryPincode      String?
+  discrepancyAdjusted  Boolean             @default(false)
+  discrepancyDetails   String?             // JSON string if adjusted
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  escrowTransaction    EscrowTransaction?
+  hubIntake            HubIntake?
+  dispatch             Dispatch?
+  rating               Rating?
+  dispute              Dispute?
+
+  @@index([buyerId])
+  @@index([listingId])
+  @@map("orders")
+}
+
+model EscrowTransaction {
+  id          String    @id @default(uuid())
+  orderId     String    @unique @map("order_id")
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status      String    @default("HELD") // HELD | RELEASED | REFUNDED
+  gatewayRef  String?   @map("gateway_ref")
+  amount      Float
+  heldAt      DateTime  @default(now()) @map("held_at")
+  releasedAt  DateTime? @map("released_at")
+  refundedAt  DateTime? @map("refunded_at")
+  payoutTxRef String?   @map("payout_tx_ref")
+  notes       String?
+
+  @@map("escrow_transactions")
+}
+
+model HubIntake {
+  id               String   @id @default(uuid())
+  orderId          String   @unique @map("order_id")
+  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lane             String   @default("FARMER_DROPOFF") // FARMER_DROPOFF | LOGISTICS_PICKUP
+  receivedWeight   Float?   @map("received_weight")
+  confirmedGrade   String?  @map("confirmed_grade") // A | B | C
+  discrepancyNotes String?  @map("discrepancy_notes")
+  inspectedAt      DateTime? @map("inspected_at")
+  staffName        String?  @map("staff_name")
+
+  @@map("hub_intake")
+}
+
+model Dispatch {
+  id           String    @id @default(uuid())
+  orderId      String    @unique @map("order_id")
+  order        Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  route        String?
+  vehicleId    String?   @map("vehicle_id")
+  driverName   String?   @map("driver_name")
+  driverPhone  String?   @map("driver_phone")
+  status       String    @default("READY") // READY | ASSIGNED | IN_TRANSIT | DELIVERED
+  eta          String?
+  dispatchedAt DateTime? @map("dispatched_at")
+  deliveredAt  DateTime? @map("delivered_at")
+
+  @@map("dispatch")
+}
+
+model Rating {
+  id            String   @id @default(uuid())
+  orderId       String   @unique @map("order_id")
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  authorId      String   @map("author_id")
+  author        User     @relation("RatingAuthor", fields: [authorId], references: [id])
+  farmerId      String   @map("farmer_id")
+  farmerProfile FarmerProfile @relation("FarmerRatings", fields: [farmerId], references: [id])
+  rating        Int      @default(5) // 1-5 overall
+  qualityRating Int      @default(5) // 1-5 produce quality
+  deliveryRating Int     @default(5) // 1-5 logistics rating
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  @@map("ratings")
+}
+
+model Dispute {
+  id              String    @id @default(uuid())
+  orderId         String    @unique @map("order_id")
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reason          String
+  status          String    @default("OPEN") // OPEN | RESOLVED_REFUND | RESOLVED_PARTIAL | RESOLVED_REGRADE
+  refundAmount    Float?    @map("refund_amount")
+  resolutionNotes String?   @map("resolution_notes")
+  resolvedAt      DateTime? @map("resolved_at")
+  createdAt       DateTime  @default(now())
+
+  @@map("disputes")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("INFO") // INFO | SUCCESS | WARNING | ALERT
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("notifications")
+}

@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+*/node_modules/
+.pnpm-store/
+
+# Production builds
+dist/
+*/dist/
+build/
+*/build/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# SQLite Database files (generated locally via prisma db push / seed)
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# Uploads (ignore uploaded images, keep directory)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS and Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
