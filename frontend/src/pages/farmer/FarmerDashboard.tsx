@@ -24,14 +24,19 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ onNavigate, op
   const { user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [advisory, setAdvisory] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getFarmerDashboard()
-      .then((res) => {
+    Promise.all([
+      api.getFarmerDashboard().then((res) => {
         setStats(res.stats);
         setRecentActivity(res.recentActivity || []);
-      })
+      }),
+      api.getFarmerDemandAdvisory().then((res) => {
+        setAdvisory(res);
+      }),
+    ])
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -138,6 +143,75 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ onNavigate, op
         </div>
 
       </div>
+
+      {/* AI Market Demand & Planting/Harvest Advisory */}
+      {advisory?.topOpportunities?.length > 0 && (
+        <div className="bg-gradient-to-r from-emerald-950 via-teal-900 to-stone-900 rounded-3xl p-6 text-white shadow-xl border border-emerald-800/40">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold mb-1 border border-emerald-500/30">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>AI Crop Demand Forecasting & Mandi Price Intelligence</span>
+              </div>
+              <h2 className="text-xl font-extrabold tracking-tight">
+                Recommended Crops to Harvest & List Now
+              </h2>
+              <p className="text-xs text-emerald-200/80 mt-0.5">
+                Calculated from regional retail demand velocity, festival events, and Mandi market arrivals.
+              </p>
+            </div>
+
+            <button
+              onClick={() => onNavigate('farmer-produce')}
+              className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black text-xs transition flex items-center gap-2 shrink-0 shadow-md"
+            >
+              <Plus className="w-4 h-4" />
+              <span>List Recommended Produce</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {advisory.topOpportunities.map((crop: any, idx: number) => (
+              <div
+                key={idx}
+                className="bg-white/5 rounded-2xl p-4 border border-white/10 hover:border-emerald-400/50 transition flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-sm font-extrabold text-white">{crop.cropName}</span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
+                        crop.urgency === 'HIGH'
+                          ? 'bg-rose-500/30 text-rose-300 border border-rose-500/40'
+                          : 'bg-amber-500/30 text-amber-300 border border-amber-500/40'
+                      }`}
+                    >
+                      {crop.urgency} Urgency
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span className="text-lg font-black text-emerald-300">₹{crop.projectedPrice}/kg</span>
+                    <span className="text-xs text-stone-400 line-through">₹{crop.currentMandiPrice}/kg</span>
+                    <span className="text-[11px] font-extrabold text-emerald-400">
+                      +{crop.potentialMarginGainPct}% surge
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-stone-300/90 leading-relaxed mb-3">
+                    {crop.actionAdvice}
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-white/10 flex items-center justify-between text-[11px]">
+                  <span className="text-stone-400">Packaging:</span>
+                  <span className="text-emerald-200 font-semibold">{crop.recommendedPackaging}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Recent Orders / Pipeline Activity Feed */}
       <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">

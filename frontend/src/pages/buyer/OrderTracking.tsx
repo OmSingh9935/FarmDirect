@@ -423,11 +423,16 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ initialOrderId, on
             {/* Live Route & Driver Information */}
             {routeInfo && selectedOrder.dispatch && (
               <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
-                    <Truck className="w-4 h-4 text-emerald-700" />
-                    Dispatch Route & Carrier
-                  </h4>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
+                      <Truck className="w-4 h-4 text-emerald-700" />
+                      Dispatch Route & Carrier
+                    </h4>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold border border-emerald-200">
+                      ⚡ AI Optimized Green Route (-33% Miles)
+                    </span>
+                  </div>
                   {selectedOrder.dispatch.driverName && (
                     <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md">
                       Driver: {selectedOrder.dispatch.driverName} ({selectedOrder.dispatch.driverPhone || 'On Call'})

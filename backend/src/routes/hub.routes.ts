@@ -19,4 +19,9 @@ router.put('/thresholds', authenticate, requireRole(['hub_admin']), HubControlle
 router.get('/disputes', authenticate, requireRole(['hub_admin']), HubController.getDisputes);
 router.post('/disputes/resolve', authenticate, requireRole(['hub_admin']), HubController.resolveDispute);
 
+// AI Engines: Demand Forecasting & Route Optimization
+router.get('/ai/forecast', authenticate, requireRole(['hub_admin']), HubController.getDemandForecast);
+router.get('/ai/optimize-routes', authenticate, requireRole(['hub_admin']), HubController.getOptimizedRoutes);
+router.post('/ai/optimize-routes', authenticate, requireRole(['hub_admin']), HubController.getOptimizedRoutes);
+
 export default router;

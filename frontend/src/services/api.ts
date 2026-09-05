@@ -1,6 +1,6 @@
 // API client with credentials support
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const API_BASE = (import.meta as any).env?.VITE_API_URL || '/api';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
@@ -228,6 +228,21 @@ export const api = {
 
   getFairPriceRecommendation: (cropId: string, grade = 'A') =>
     request<any>(`/mandi/recommendation?cropId=${cropId}&grade=${grade}`),
+
+  // AI Engines: Demand Forecasting & Route Optimization
+  getDemandForecast: (params: { horizonDays?: number; region?: string; eventShock?: boolean } = {}) => {
+    const query = new URLSearchParams();
+    if (params.horizonDays) query.append('horizonDays', String(params.horizonDays));
+    if (params.region) query.append('region', params.region);
+    if (params.eventShock !== undefined) query.append('eventShock', String(params.eventShock));
+    return request<any>(`/hub/ai/forecast?${query.toString()}`);
+  },
+
+  getOptimizedRoutes: () =>
+    request<any>('/hub/ai/optimize-routes'),
+
+  getFarmerDemandAdvisory: () =>
+    request<any>('/farmer/demand-advisory'),
 };
 
 export default api;

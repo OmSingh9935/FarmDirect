@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import prisma from '../prisma.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
+import AIForecastingService from '../services/ai_forecasting.service.js';
 
 export class FarmerController {
   // Farmer dashboard overview stats
@@ -169,6 +170,16 @@ export class FarmerController {
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message || 'Failed to update profile' });
+    }
+  }
+
+  // AI Market Demand & Planting/Harvest Advisory for Farmers
+  static async getCropDemandAdvisory(req: AuthenticatedRequest, res: Response) {
+    try {
+      const recommendations = await AIForecastingService.getFarmerRecommendations(req.user?.userId);
+      return res.json(recommendations);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Failed to fetch AI crop demand advisory' });
     }
   }
 }

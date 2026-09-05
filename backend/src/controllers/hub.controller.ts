@@ -3,6 +3,8 @@ import prisma from '../prisma.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import GradingService from '../services/grading.service.js';
 import EscrowService from '../services/escrow.service.js';
+import AIForecastingService from '../services/ai_forecasting.service.js';
+import AIRoutingService from '../services/ai_routing.service.js';
 
 export class HubController {
   // 1. Platform Executive Analytics for Admin
@@ -644,6 +646,31 @@ export class HubController {
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message || 'Failed to resolve dispute' });
+    }
+  }
+
+  // 10. AI Demand Forecasting Engine
+  static async getDemandForecast(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { horizonDays, region, eventShock } = req.query;
+      const forecast = await AIForecastingService.generateDemandForecast({
+        horizonDays: horizonDays ? parseInt(horizonDays as string) : 14,
+        region: (region as string) || 'ALL',
+        eventShock: eventShock === 'true' || eventShock === '1',
+      });
+      return res.json(forecast);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Failed to generate AI demand forecast' });
+    }
+  }
+
+  // 11. AI Route Optimizer Solver (VRPTW & Cold-Chain Constraints)
+  static async getOptimizedRoutes(req: AuthenticatedRequest, res: Response) {
+    try {
+      const solution = await AIRoutingService.solveOptimalRoutes();
+      return res.json(solution);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Failed to solve optimal logistics routes' });
     }
   }
 }
