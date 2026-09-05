@@ -40,14 +40,24 @@ const MainApp: React.FC = () => {
     setSelectedListing(listing);
   };
 
-  const handleQuickBuy = (listing: Listing) => {
-    setSingleBuyItem({ listing, quantity: 25 });
+  const handleQuickBuy = (listing: Listing, quantity: number = 10) => {
+    const validQty = Math.max(1, Math.min(listing.quantity, quantity));
+    setSingleBuyItem({ listing, quantity: validQty });
     setIsCheckoutOpen(true);
+  };
+
+  const handleUpdateSingleBuyQuantity = (quantity: number) => {
+    setSingleBuyItem((prev) => {
+      if (!prev) return null;
+      const validQty = Math.max(1, Math.min(prev.listing.quantity, quantity));
+      return { ...prev, quantity: validQty };
+    });
   };
 
   const handleProceedFromDetail = (listing: Listing, quantity: number) => {
     setSelectedListing(null);
-    setSingleBuyItem({ listing, quantity });
+    const validQty = Math.max(1, Math.min(listing.quantity, quantity));
+    setSingleBuyItem({ listing, quantity: validQty });
     setIsCheckoutOpen(true);
   };
 
@@ -147,6 +157,7 @@ const MainApp: React.FC = () => {
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         singleBuyItem={singleBuyItem}
+        onUpdateSingleBuyQuantity={handleUpdateSingleBuyQuantity}
         onOrderSuccess={handleOrderSuccess}
       />
 

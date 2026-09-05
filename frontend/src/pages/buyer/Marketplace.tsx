@@ -12,6 +12,8 @@ import {
   Wheat,
   ShieldCheck,
   ChevronRight,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import { Listing } from '../../types/index.js';
 import api from '../../services/api.js';
@@ -20,7 +22,7 @@ import { useToast } from '../../context/ToastContext.js';
 
 interface MarketplaceProps {
   onSelectListing: (listing: Listing) => void;
-  onQuickBuy: (listing: Listing) => void;
+  onQuickBuy: (listing: Listing, quantity?: number) => void;
 }
 
 export const Marketplace: React.FC<MarketplaceProps> = ({ onSelectListing, onQuickBuy }) => {
@@ -28,6 +30,16 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onSelectListing, onQui
   const { success } = useToast();
 
   const [listings, setListings] = useState<Listing[]>([]);
+  const [cardQuantities, setCardQuantities] = useState<Record<string, number>>({});
+
+  const getQuantityForListing = (listing: Listing) => {
+    return cardQuantities[listing.id] ?? Math.min(10, listing.quantity);
+  };
+
+  const handleCardQuantityChange = (listingId: string, maxQty: number, nextQty: number) => {
+    const clamped = Math.max(1, Math.min(maxQty, nextQty));
+    setCardQuantities((prev) => ({ ...prev, [listingId]: clamped }));
+  };
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState<string>('');
   const [selectedGrade, setSelectedGrade] = useState<string>('');
@@ -292,30 +304,94 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ onSelectListing, onQui
                       </div>
                     </div>
 
-                    {/* Price and Actions */}
-                    <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
-                      <div>
-                        <div className="text-lg font-extrabold text-emerald-950">
-                          ₹{item.pricePerUnit}
-                          <span className="text-xs font-medium text-stone-500">/{item.unit}</span>
+                    {/* Interactive Quantity Selector */}
+                    <div className="mt-3 pt-2.5 border-t border-stone-100" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between text-[11px] mb-1">
+                        <span className="font-semibold text-stone-600">Select Quantity:</span>
+                        <span className="text-stone-400 text-[10px]">Stock: {item.quantity} {item.unit}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex-1 flex items-center border border-stone-200 rounded-xl bg-stone-50 overflow-hidden focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500">
+                          <button
+                            type="button"
+                            onClick={() => handleCardQuantityChange(item.id, item.quantity, getQuantityForListing(item) - (getQuantityForListing(item) > 10 ? 5 : 1))}
+                            disabled={getQuantityForListing(item) <= 1}
+                            className="px-2 py-1 text-stone-600 hover:text-stone-900 hover:bg-stone-200 disabled:opacity-30 transition"
+                            title="Decrease quantity"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            max={item.quantity}
+                            value={getQuantityForListing(item)}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              if (!isNaN(val)) {
+                                handleCardQuantityChange(item.id, item.quantity, val);
+                              }
+                            }}
+                            className="w-full text-center font-bold text-xs bg-transparent text-stone-900 focus:outline-none py-1"
+                          />
+                          <span className="text-[10px] font-semibold text-stone-400 pr-1.5 shrink-0">{item.unit}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCardQuantityChange(item.id, item.quantity, getQuantityForListing(item) + (getQuantityForListing(item) >= 10 ? 5 : 1))}
+                            disabled={getQuantityForListing(item) >= item.quantity}
+                            className="px-2 py-1 text-stone-600 hover:text-stone-900 hover:bg-stone-200 disabled:opacity-30 transition"
+                            title="Increase quantity"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        <div className="text-[10px] text-stone-400">Ex-Farm Escrow Price</div>
+
+                        {/* Quick Presets */}
+                        <div className="flex gap-1 shrink-0">
+                          {[10, 25, 50].filter(q => q <= item.quantity).map(q => (
+                            <button
+                              key={q}
+                              type="button"
+                              onClick={() => handleCardQuantityChange(item.id, item.quantity, q)}
+                              className={`px-1.5 py-1 rounded-lg text-[10px] font-bold transition ${
+                                getQuantityForListing(item) === q
+                                  ? 'bg-emerald-700 text-white'
+                                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                              }`}
+                              title={`Set ${q} ${item.unit}`}
+                            >
+                              {q}k
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Price and Actions */}
+                    <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between">
+                      <div>
+                        <div className="text-base font-extrabold text-emerald-950">
+                          ₹{(item.pricePerUnit * getQuantityForListing(item)).toFixed(0)}
+                          <span className="text-[10px] font-medium text-stone-500"> ({getQuantityForListing(item)} {item.unit})</span>
+                        </div>
+                        <div className="text-[10px] text-stone-400">₹{item.pricePerUnit}/{item.unit} ex-farm</div>
                       </div>
 
                       <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => {
-                            addToCart(item, 10);
-                            success('Added to Cart', `10 ${item.unit} of ${item.crop.name} added`);
+                            const qty = getQuantityForListing(item);
+                            addToCart(item, qty);
+                            success('Added to Cart', `${qty} ${item.unit} of ${item.crop.name} added`);
                           }}
                           className="p-2 rounded-xl border border-stone-300 hover:border-emerald-600 hover:bg-emerald-50 text-stone-700 transition"
-                          title="Add 10kg to Cart"
+                          title={`Add ${getQuantityForListing(item)} ${item.unit} to Cart`}
                         >
                           <ShoppingBag className="w-4 h-4 text-emerald-700" />
                         </button>
                         <button
-                          onClick={() => onQuickBuy(item)}
-                          className="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow transition"
+                          onClick={() => onQuickBuy(item, getQuantityForListing(item))}
+                          className="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow transition flex items-center gap-1"
                         >
                           Buy Now
                         </button>

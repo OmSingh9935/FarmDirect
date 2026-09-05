@@ -83,17 +83,40 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
                       {/* Quantity buttons */}
                       <div className="flex items-center border border-stone-300 rounded-lg overflow-hidden bg-white">
                         <button
-                          onClick={() => updateQuantity(listing.id, quantity - 5)}
-                          className="px-1.5 py-0.5 hover:bg-stone-100 text-stone-600"
+                          type="button"
+                          onClick={() => {
+                            const step = quantity > 25 ? 5 : 1;
+                            updateQuantity(listing.id, Math.max(1, quantity - step));
+                          }}
+                          disabled={quantity <= 1}
+                          className="px-1.5 py-0.5 hover:bg-stone-100 text-stone-600 disabled:opacity-30 transition"
+                          title="Decrease quantity"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
-                        <span className="px-2 text-xs font-bold text-stone-800">
-                          {quantity}{listing.unit}
-                        </span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={listing.quantity}
+                          value={quantity}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val)) {
+                              updateQuantity(listing.id, Math.max(1, Math.min(listing.quantity, val)));
+                            }
+                          }}
+                          className="w-10 text-center text-xs font-bold text-stone-800 focus:outline-none focus:bg-emerald-50 py-0.5"
+                        />
+                        <span className="text-[10px] text-stone-400 pr-1">{listing.unit}</span>
                         <button
-                          onClick={() => updateQuantity(listing.id, quantity + 5)}
-                          className="px-1.5 py-0.5 hover:bg-stone-100 text-stone-600"
+                          type="button"
+                          onClick={() => {
+                            const step = quantity >= 25 ? 5 : 1;
+                            updateQuantity(listing.id, Math.min(listing.quantity, quantity + step));
+                          }}
+                          disabled={quantity >= listing.quantity}
+                          className="px-1.5 py-0.5 hover:bg-stone-100 text-stone-600 disabled:opacity-30 transition"
+                          title="Increase quantity"
                         >
                           <Plus className="w-3 h-3" />
                         </button>

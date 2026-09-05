@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, CreditCard, Lock, CheckCircle2, ArrowRight, RefreshCw, Truck, MapPin } from 'lucide-react';
+import { X, ShieldCheck, CreditCard, Lock, CheckCircle2, ArrowRight, RefreshCw, Truck, MapPin, Plus, Minus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
 import { useCart } from '../../context/CartContext.js';
 import { useToast } from '../../context/ToastContext.js';
@@ -10,6 +10,7 @@ interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   singleBuyItem?: { listing: any; quantity: number } | null;
+  onUpdateSingleBuyQuantity?: (quantity: number) => void;
   onOrderSuccess: (orderId: string) => void;
 }
 
@@ -17,10 +18,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
   onClose,
   singleBuyItem,
+  onUpdateSingleBuyQuantity,
   onOrderSuccess,
 }) => {
   const { user, openAuthModal } = useAuth();
-  const { items: cartItems, clearCart, subtotal: cartSubtotal } = useCart();
+  const { items: cartItems, clearCart, subtotal: cartSubtotal, updateQuantity, removeFromCart } = useCart();
   const { success, error: toastError } = useToast();
 
   const checkoutItems: CartItem[] = singleBuyItem
@@ -30,6 +32,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const subtotal = singleBuyItem
     ? singleBuyItem.listing.pricePerUnit * singleBuyItem.quantity
     : cartSubtotal;
+
+  const totalWeightKg = checkoutItems.reduce((sum, item) => {
+    const isQuintal = item.listing.unit?.toLowerCase().includes('quintal');
+    return sum + (isQuintal ? item.quantity * 100 : item.quantity);
+  }, 0);
+  const isDirectFarmGate = totalWeightKg >= 50; // 0.5 quintal threshold
 
   const estimatedLogistics = subtotal > 2000 ? 150 : 80;
   const grandTotal = parseFloat((subtotal + estimatedLogistics).toFixed(2));
@@ -166,25 +174,140 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               </div>
 
-              {/* Order Items Preview */}
+              {/* Order Items Preview with Customizable Quantities */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-1.5">
-                  Produce Items ({checkoutItems.length})
-                </label>
-                <div className="max-h-36 overflow-y-auto space-y-2 pr-1 border border-stone-200 rounded-xl p-2.5 bg-stone-50">
-                  {checkoutItems.map((item) => (
-                    <div key={item.listing.id} className="flex justify-between items-center text-xs">
-                      <div>
-                        <div className="font-bold text-stone-900">{item.listing.crop.name}</div>
-                        <div className="text-[11px] text-stone-500">
-                          {item.quantity} {item.listing.unit} • Grade {item.listing.aiGrade}
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
+                    Produce Items ({checkoutItems.length})
+                  </label>
+                  <span className="text-[10px] text-stone-400 font-medium">Customize quantities anytime</span>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto space-y-2 pr-1 border border-stone-200 rounded-2xl p-2.5 bg-stone-50">
+                  {checkoutItems.length === 0 ? (
+                    <div className="text-center py-4 text-xs text-stone-400">No items selected</div>
+                  ) : (
+                    checkoutItems.map((item) => {
+                      const maxStock = item.listing.quantity;
+                      return (
+                        <div
+                          key={item.listing.id}
+                          className="p-2.5 rounded-xl bg-white border border-stone-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <img
+                              src={item.listing.photos?.[0] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=800'}
+                              alt={item.listing.crop?.name || 'Produce'}
+                              className="w-10 h-10 rounded-lg object-cover border border-stone-200 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <div className="font-extrabold text-xs text-stone-900 truncate">
+                                {item.listing.crop.name}
+                              </div>
+                              <div className="text-[10px] text-stone-500 flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-emerald-800">Grade {item.listing.aiGrade}</span>
+                                <span>•</span>
+                                <span>₹{item.listing.pricePerUnit}/{item.listing.unit}</span>
+                                <span>•</span>
+                                <span className="text-stone-400">Stock: {maxStock} {item.listing.unit}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                            {/* Quantity Stepper & Input */}
+                            <div className="flex items-center border border-stone-300 rounded-lg overflow-hidden bg-stone-50">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const step = item.quantity > 25 ? 5 : 1;
+                                  const newQty = Math.max(1, item.quantity - step);
+                                  if (singleBuyItem && onUpdateSingleBuyQuantity) {
+                                    onUpdateSingleBuyQuantity(newQty);
+                                  } else {
+                                    updateQuantity(item.listing.id, newQty);
+                                  }
+                                }}
+                                disabled={item.quantity <= 1}
+                                className="px-2 py-1 text-stone-600 hover:bg-stone-200 disabled:opacity-30 transition"
+                                title="Decrease quantity"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <input
+                                type="number"
+                                min={1}
+                                max={maxStock}
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  if (!isNaN(val)) {
+                                    const clamped = Math.max(1, Math.min(maxStock, val));
+                                    if (singleBuyItem && onUpdateSingleBuyQuantity) {
+                                      onUpdateSingleBuyQuantity(clamped);
+                                    } else {
+                                      updateQuantity(item.listing.id, clamped);
+                                    }
+                                  }
+                                }}
+                                className="w-12 text-center font-bold text-xs bg-white text-stone-900 py-1 focus:outline-none focus:bg-emerald-50"
+                              />
+                              <span className="text-[10px] font-medium text-stone-400 px-1 bg-stone-50">
+                                {item.listing.unit}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const step = item.quantity >= 25 ? 5 : 1;
+                                  const newQty = Math.min(maxStock, item.quantity + step);
+                                  if (singleBuyItem && onUpdateSingleBuyQuantity) {
+                                    onUpdateSingleBuyQuantity(newQty);
+                                  } else {
+                                    updateQuantity(item.listing.id, newQty);
+                                  }
+                                }}
+                                disabled={item.quantity >= maxStock}
+                                className="px-2 py-1 text-stone-600 hover:bg-stone-200 disabled:opacity-30 transition"
+                                title="Increase quantity"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            <div className="text-right min-w-[65px]">
+                              <div className="font-extrabold text-xs text-stone-900">
+                                ₹{(item.listing.pricePerUnit * item.quantity).toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="font-extrabold text-stone-900">
-                        ₹{(item.listing.pricePerUnit * item.quantity).toFixed(2)}
-                      </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Dynamic 0.5 Quintal Logistics Routing Badge */}
+                <div className={`mt-2 p-2.5 rounded-xl border flex items-center justify-between text-xs ${
+                  isDirectFarmGate
+                    ? 'bg-amber-50/80 border-amber-300 text-amber-950'
+                    : 'bg-emerald-50/80 border-emerald-300 text-emerald-950'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <Truck className={`w-4 h-4 shrink-0 ${isDirectFarmGate ? 'text-amber-600' : 'text-emerald-600'}`} />
+                    <div>
+                      <span className="font-extrabold">
+                        {isDirectFarmGate ? 'Direct Farm Gate Truck Pickup' : 'Consolidated Hub Transit'}
+                      </span>
+                      <span className="text-[10px] text-stone-500 block">
+                        Total weight: {totalWeightKg} kg {isDirectFarmGate ? '(≥ 50kg / 0.5 Qtl: direct vehicle)' : '(< 50kg: village hub intake)'}
+                      </span>
                     </div>
-                  ))}
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isDirectFarmGate ? 'bg-amber-200 text-amber-900' : 'bg-emerald-200 text-emerald-900'
+                  }`}>
+                    {isDirectFarmGate ? '≥ 0.5 Qtl' : '< 0.5 Qtl'}
+                  </span>
                 </div>
               </div>
 
