@@ -282,7 +282,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, openV
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs shadow-sm transition"
               >
                 <UserIcon className="w-3.5 h-3.5" />
-                <span>Sign In / OTP</span>
+                <span>Sign In / Register</span>
               </button>
             )}
           </div>

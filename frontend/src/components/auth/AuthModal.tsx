@@ -1,5 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Wheat, ShoppingBag, ArrowRight, CheckCircle2, ShieldCheck, Mail, Clock, RefreshCw, Lock, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  Wheat,
+  ShoppingBag,
+  ArrowRight,
+  ShieldCheck,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  User,
+  Phone,
+  MapPin,
+  Building2,
+  UserPlus,
+  LogIn,
+  RefreshCw,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
 import { useToast } from '../../context/ToastContext.js';
 import api from '../../services/api.js';
@@ -9,36 +26,36 @@ export const AuthModal: React.FC = () => {
   const { isAuthModalOpen, closeAuthModal, authModalRole, loginWithUser } = useAuth();
   const { success, error: toastError } = useToast();
 
+  // 'login' or 'register'
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+
+  // Selected role for login or registration
   const [selectedRole, setSelectedRole] = useState<UserRole>(authModalRole || 'buyer');
-  const [step, setStep] = useState<'email' | 'otp' | 'farmer_onboarding' | 'buyer_onboarding'>('email');
-  const [email, setEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('Omsingh@123');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
-  const [onboardingToken, setOnboardingToken] = useState('');
 
-  // 6 segmented OTP inputs
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  // Login form state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
-  // Farmer Onboarding Form State
+  // Farmer registration form state
   const [farmerForm, setFarmerForm] = useState({
     name: '',
+    email: '',
+    password: '',
     phone: '',
     village: '',
     pincode: '',
     district: '',
-    bankAccountNumber: '',
-    ifscCode: '',
+    state: 'Maharashtra',
     upiId: '',
-    preferredLanguage: 'en',
-    aadhaarOptional: '',
   });
+  const [showFarmerPassword, setShowFarmerPassword] = useState(false);
 
-  // Buyer Onboarding Form State
+  // Buyer registration form state
   const [buyerForm, setBuyerForm] = useState({
     name: '',
+    email: '',
+    password: '',
     phone: '',
     buyerType: 'INDIVIDUAL' as 'INDIVIDUAL' | 'BULK_FPO',
     orgName: '',
@@ -48,180 +65,102 @@ export const AuthModal: React.FC = () => {
     state: 'Maharashtra',
     pincode: '',
   });
+  const [showBuyerPassword, setShowBuyerPassword] = useState(false);
 
-  useEffect(() => {
-    setSelectedRole(authModalRole);
-    if (authModalRole === 'hub_admin') {
-      setEmail('omsingh203090@gmail.com');
-      setAdminPassword('Omsingh@123');
-    }
-  }, [authModalRole]);
+  const [loading, setLoading] = useState(false);
 
-  // Cooldown countdown timer
+  // Synchronize role whenever authModalRole changes
   useEffect(() => {
-    if (cooldown > 0) {
-      const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
-      return () => clearTimeout(timer);
+    const r = authModalRole || 'buyer';
+    setSelectedRole(r);
+    if (r === 'hub_admin') {
+      setMode('login');
+      setLoginEmail('omsingh203090@gmail.com');
+      setLoginPassword('Omsingh@123');
+    } else {
+      if (loginEmail === 'omsingh203090@gmail.com') {
+        setLoginEmail('');
+        setLoginPassword('');
+      }
     }
-  }, [cooldown]);
+  }, [authModalRole, isAuthModalOpen]);
 
   if (!isAuthModalOpen) return null;
 
-  // 1. Request Real OTP
-  const handleRequestOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!email || !email.includes('@')) {
-      toastError('Invalid Email', 'Please enter a valid email address');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await api.requestOtp(email, selectedRole);
-      setCooldown(res.cooldown || 60);
-      setStep('otp');
-      success('Verification Code Dispatched', res.message);
-    } catch (err: any) {
-      toastError('OTP Request Failed', err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 1b. Direct Admin Password Login
-  const handlePasswordLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!email || !email.includes('@')) {
-      toastError('Invalid Email', 'Please enter your admin email address');
-      return;
-    }
-    if (!adminPassword) {
-      toastError('Missing Password', 'Please enter your admin password');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await api.loginWithPassword(email, adminPassword);
-      loginWithUser(res.user);
-      success('Admin Authenticated', `Welcome back, ${res.user.name}`);
-      closeAuthModal();
-    } catch (err: any) {
-      toastError('Authentication Failed', err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Auto-advance segmented OTP input
-  const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) {
-      // Paste handling
-      const pasted = value.replace(/\D/g, '').slice(0, 6);
-      if (pasted.length > 0) {
-        const newDigits = [...otpDigits];
-        for (let i = 0; i < 6; i++) {
-          newDigits[i] = pasted[i] || '';
-        }
-        setOtpDigits(newDigits);
-        const nextIdx = Math.min(pasted.length, 5);
-        inputRefs.current[nextIdx]?.focus();
-      }
-      return;
-    }
-
-    const cleanChar = value.replace(/\D/g, '');
-    const newDigits = [...otpDigits];
-    newDigits[index] = cleanChar;
-    setOtpDigits(newDigits);
-
-    if (cleanChar && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  // 2. Verify OTP
-  const handleVerifyOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const code = otpDigits.join('');
-    if (code.length !== 6) {
-      toastError('Invalid Code', 'Please enter all 6 digits of the verification code');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await api.verifyOtp(email, code);
-
-      if (res.isNewUser && res.onboardingToken) {
-        setOnboardingToken(res.onboardingToken);
-        if (selectedRole === 'farmer') {
-          setStep('farmer_onboarding');
-        } else {
-          setStep('buyer_onboarding');
-        }
-        success('Email Verified', 'Please complete your profile to finish registration.');
-      } else if (res.user) {
-        loginWithUser(res.user);
-        success('Welcome Back', `Signed in as ${res.user.name}`);
-        closeAuthModal();
-      }
-    } catch (err: any) {
-      toastError('Verification Failed', err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 3. Complete Farmer Onboarding
-  const handleFarmerOnboard = async (e: React.FormEvent) => {
+  // Handle Login Submit
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!farmerForm.name || !farmerForm.phone || !farmerForm.village || !farmerForm.pincode) {
-      toastError('Missing Details', 'Please fill in all mandatory profile fields');
+    if (!loginEmail || !loginEmail.includes('@')) {
+      toastError('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+    if (!loginPassword) {
+      toastError('Missing Password', 'Please enter your password.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await api.completeFarmerOnboarding({
-        onboardingToken,
-        ...farmerForm,
-      });
+      const res = await api.login(loginEmail, loginPassword);
       loginWithUser(res.user);
-      success('Registration Complete', 'Welcome to FarmDirect! Your farmer account is active.');
+      success('Welcome Back', `Successfully signed in as ${res.user.name}`);
       closeAuthModal();
     } catch (err: any) {
-      toastError('Onboarding Failed', err.message);
+      toastError('Sign In Failed', err.message || 'Invalid email or password');
     } finally {
       setLoading(false);
     }
   };
 
-  // 4. Complete Buyer Onboarding
-  const handleBuyerOnboard = async (e: React.FormEvent) => {
+  // Handle Farmer Registration Submit
+  const handleFarmerRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!buyerForm.name || !buyerForm.phone || !buyerForm.addressLine || !buyerForm.city || !buyerForm.pincode) {
-      toastError('Missing Details', 'Please fill in all required delivery details');
+    if (!farmerForm.name || !farmerForm.email || !farmerForm.password || !farmerForm.phone || !farmerForm.village || !farmerForm.pincode) {
+      toastError('Missing Details', 'Please fill in all mandatory fields.');
+      return;
+    }
+    if (farmerForm.password.length < 6) {
+      toastError('Weak Password', 'Password must be at least 6 characters.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await api.completeBuyerOnboarding({
-        onboardingToken,
-        ...buyerForm,
-      });
+      const res = await api.registerFarmer(farmerForm);
       loginWithUser(res.user);
-      success('Account Created', 'Welcome to FarmDirect marketplace!');
+      success('Farmer Account Created', `Welcome to FarmDirect, ${res.user.name}!`);
       closeAuthModal();
     } catch (err: any) {
-      toastError('Onboarding Failed', err.message);
+      toastError('Registration Failed', err.message || 'Could not complete farmer registration.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Buyer Registration Submit
+  const handleBuyerRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!buyerForm.name || !buyerForm.email || !buyerForm.password || !buyerForm.phone || !buyerForm.addressLine || !buyerForm.city || !buyerForm.pincode) {
+      toastError('Missing Details', 'Please fill in all mandatory fields.');
+      return;
+    }
+    if (buyerForm.buyerType === 'BULK_FPO' && !buyerForm.orgName) {
+      toastError('Missing Org Name', 'Please provide the Organization / FPO name.');
+      return;
+    }
+    if (buyerForm.password.length < 6) {
+      toastError('Weak Password', 'Password must be at least 6 characters.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.registerBuyer(buyerForm);
+      loginWithUser(res.user);
+      success('Buyer Account Created', `Welcome to FarmDirect, ${res.user.name}!`);
+      closeAuthModal();
+    } catch (err: any) {
+      toastError('Registration Failed', err.message || 'Could not complete buyer registration.');
     } finally {
       setLoading(false);
     }
@@ -229,45 +168,82 @@ export const AuthModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-stone-200 overflow-hidden">
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-stone-200 overflow-hidden max-h-[92vh] flex flex-col">
         
-        {/* Header bar */}
-        <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 px-6 py-6 text-white text-center relative">
+        {/* Header bar with FarmDirect logo */}
+        <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 px-6 py-5 text-white text-center relative shrink-0">
           <button
             onClick={closeAuthModal}
-            className="absolute top-4 right-4 text-emerald-300 hover:text-white transition"
+            className="absolute top-4 right-4 text-emerald-300 hover:text-white transition p-1"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
 
-          <div className="inline-block bg-white rounded-2xl px-4 py-2.5 shadow-lg mx-auto mb-3 border border-white/40">
+          <div className="inline-block bg-white rounded-2xl px-4 py-2 shadow-md mx-auto mb-2 border border-white/40">
             <img
               src="/logo.png"
-              alt="Farm Direct — Direct Harvest & Escrow"
-              className="h-9 sm:h-10 w-auto object-contain mx-auto"
+              alt="Farm Direct"
+              className="h-8 sm:h-9 w-auto object-contain mx-auto"
             />
           </div>
-          <h2 className="text-lg font-black tracking-tight text-white">Secure Portal Access</h2>
-          <p className="text-xs text-emerald-200 mt-0.5">DIRECT HARVEST & ESCROW</p>
+          <h2 className="text-base font-extrabold tracking-tight text-white">
+            {mode === 'login' ? 'Sign In to Your Account' : 'Create a New Account'}
+          </h2>
+          <p className="text-xs text-emerald-200">DIRECT HARVEST & ESCROW MARKETPLACE</p>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6">
+        {/* Tab Switcher: Sign In vs Create Account */}
+        <div className="grid grid-cols-2 border-b border-stone-200 bg-stone-50 shrink-0">
+          <button
+            type="button"
+            onClick={() => setMode('login')}
+            className={`flex items-center justify-center gap-2 py-3 text-xs font-bold transition border-b-2 ${
+              mode === 'login'
+                ? 'border-emerald-700 text-emerald-900 bg-white'
+                : 'border-transparent text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Sign In</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('register');
+              if (selectedRole === 'hub_admin') setSelectedRole('buyer');
+            }}
+            className={`flex items-center justify-center gap-2 py-3 text-xs font-bold transition border-b-2 ${
+              mode === 'register'
+                ? 'border-emerald-700 text-emerald-900 bg-white'
+                : 'border-transparent text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>New User Registration</span>
+          </button>
+        </div>
 
-          {/* STEP 1: Email Entry & Role Selection */}
-          {step === 'email' && (
+        {/* Modal Scrollable Body */}
+        <div className="p-6 overflow-y-auto flex-1">
+
+          {/* ================= MODE: LOGIN ================= */}
+          {mode === 'login' && (
             <div>
-              {/* Role Toggle */}
-              <div className="mb-5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">
-                  Select Portal Role
+              {/* Role Indicator / Selector */}
+              <div className="mb-4">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1.5">
+                  Sign In As
                 </label>
                 <div className="grid grid-cols-3 gap-1.5 p-1 bg-stone-100 rounded-xl">
                   <button
                     type="button"
                     onClick={() => {
                       setSelectedRole('buyer');
-                      if (email === 'omsingh203090@gmail.com') setEmail('');
+                      if (loginEmail === 'omsingh203090@gmail.com') {
+                        setLoginEmail('');
+                        setLoginPassword('');
+                      }
                     }}
                     className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition ${
                       selectedRole === 'buyer'
@@ -283,7 +259,10 @@ export const AuthModal: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setSelectedRole('farmer');
-                      if (email === 'omsingh203090@gmail.com') setEmail('');
+                      if (loginEmail === 'omsingh203090@gmail.com') {
+                        setLoginEmail('');
+                        setLoginPassword('');
+                      }
                     }}
                     className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition ${
                       selectedRole === 'farmer'
@@ -299,11 +278,12 @@ export const AuthModal: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setSelectedRole('hub_admin');
-                      setEmail('omsingh203090@gmail.com');
+                      setLoginEmail('omsingh203090@gmail.com');
+                      setLoginPassword('Omsingh@123');
                     }}
                     className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition ${
                       selectedRole === 'hub_admin'
-                        ? 'bg-white text-emerald-900 shadow-sm'
+                        ? 'bg-white text-amber-950 shadow-sm ring-1 ring-amber-300'
                         : 'text-stone-600 hover:text-stone-900'
                     }`}
                   >
@@ -313,439 +293,543 @@ export const AuthModal: React.FC = () => {
                 </div>
               </div>
 
-              {selectedRole === 'hub_admin' ? (
-                /* Admin Direct Password Login Form */
-                <form onSubmit={handlePasswordLogin} className="space-y-4">
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 text-xs flex items-start gap-2">
-                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              {/* Special Banner for Admin Role */}
+              {selectedRole === 'hub_admin' && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 text-xs flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold text-amber-900">Admin & Hub Lead Portal</div>
+                    <div className="text-[11px] text-stone-600 mt-0.5">
+                      Platform credentials pre-loaded for <strong>omsingh203090@gmail.com</strong>.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Login Form */}
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      required
+                      placeholder="name@example.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                    <Mail className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showLoginPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Enter your account password"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                    <Lock className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-3 text-stone-400 hover:text-stone-700 transition"
+                      tabIndex={-1}
+                    >
+                      {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-white font-bold text-sm shadow transition disabled:opacity-50 ${
+                    selectedRole === 'hub_admin'
+                      ? 'bg-amber-700 hover:bg-amber-800'
+                      : 'bg-emerald-700 hover:bg-emerald-800'
+                  }`}
+                >
+                  {loading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <span>
+                        {selectedRole === 'hub_admin'
+                          ? 'Sign In as Admin'
+                          : selectedRole === 'farmer'
+                          ? 'Sign In as Farmer'
+                          : 'Sign In as Buyer'}
+                      </span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Switch to Register */}
+              <div className="text-center pt-4 border-t border-stone-100 mt-4">
+                <p className="text-xs text-stone-500">
+                  Don't have an account yet?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('register');
+                      if (selectedRole === 'hub_admin') setSelectedRole('buyer');
+                    }}
+                    className="font-bold text-emerald-700 hover:underline inline-flex items-center gap-1 ml-0.5"
+                  >
+                    <span>Register new account</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ================= MODE: REGISTER ================= */}
+          {mode === 'register' && (
+            <div>
+              {/* Role Toggle for Registration */}
+              <div className="mb-4">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1.5">
+                  Register Account Type
+                </label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-stone-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('buyer')}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition ${
+                      selectedRole === 'buyer'
+                        ? 'bg-white text-emerald-900 shadow-sm'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5 text-sky-600" />
+                    <span>Buyer Account</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('farmer')}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition ${
+                      selectedRole === 'farmer'
+                        ? 'bg-white text-emerald-900 shadow-sm'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    <Wheat className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Farmer Account</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* FARMER REGISTRATION FORM */}
+              {selectedRole === 'farmer' && (
+                <form onSubmit={handleFarmerRegister} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Farmer Full Name *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Ramesh Kumar"
+                        value={farmerForm.name}
+                        onChange={(e) => setFarmerForm({ ...farmerForm, name: e.target.value })}
+                        className="w-full pl-9 pr-3 py-2 rounded-xl border border-stone-300 text-sm focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <User className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Email Address *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        required
+                        placeholder="farmer@example.com"
+                        value={farmerForm.email}
+                        onChange={(e) => setFarmerForm({ ...farmerForm, email: e.target.value })}
+                        className="w-full pl-9 pr-3 py-2 rounded-xl border border-stone-300 text-sm focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <Mail className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Create Password (min 6 chars) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showFarmerPassword ? 'text' : 'password'}
+                        required
+                        minLength={6}
+                        placeholder="Create strong password"
+                        value={farmerForm.password}
+                        onChange={(e) => setFarmerForm({ ...farmerForm, password: e.target.value })}
+                        className="w-full pl-9 pr-10 py-2 rounded-xl border border-stone-300 text-sm focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <Lock className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
+                      <button
+                        type="button"
+                        onClick={() => setShowFarmerPassword(!showFarmerPassword)}
+                        className="absolute right-3 top-2.5 text-stone-400 hover:text-stone-700"
+                        tabIndex={-1}
+                      >
+                        {showFarmerPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <div className="font-bold text-amber-900">Admin Control Portal</div>
-                      <div className="text-[11px] text-stone-600 mt-0.5">
-                        Log in with your administrator credentials to access real user data, analytics, intake, and disputes.
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Phone Number *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          placeholder="+91 98220 12345"
+                          value={farmerForm.phone}
+                          onChange={(e) => setFarmerForm({ ...farmerForm, phone: e.target.value })}
+                          className="w-full pl-8 pr-2 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <Phone className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-2.5" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Pincode *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          placeholder="422202"
+                          value={farmerForm.pincode}
+                          onChange={(e) => setFarmerForm({ ...farmerForm, pincode: e.target.value })}
+                          className="w-full pl-8 pr-2 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <MapPin className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-2.5" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Village / Taluka *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Dindori"
+                        value={farmerForm.village}
+                        onChange={(e) => setFarmerForm({ ...farmerForm, village: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        District
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Nashik"
+                        value={farmerForm.district}
+                        onChange={(e) => setFarmerForm({ ...farmerForm, district: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      UPI ID for Direct Payouts (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. ramesh@okhdfcbank"
+                      value={farmerForm.upiId}
+                      onChange={(e) => setFarmerForm({ ...farmerForm, upiId: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full mt-2 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm shadow transition disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Registering Farmer...</span>
+                      </span>
+                    ) : (
+                      'Register Farmer & Access Portal'
+                    )}
+                  </button>
+                </form>
+              )}
+
+              {/* BUYER REGISTRATION FORM */}
+              {selectedRole === 'buyer' && (
+                <form onSubmit={handleBuyerRegister} className="space-y-3">
+                  {/* Buyer Type Toggle */}
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Buyer Category
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setBuyerForm({ ...buyerForm, buyerType: 'INDIVIDUAL' })}
+                        className={`py-1.5 text-xs font-semibold rounded-lg border transition ${
+                          buyerForm.buyerType === 'INDIVIDUAL'
+                            ? 'bg-emerald-50 border-emerald-600 text-emerald-900 font-bold'
+                            : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                        }`}
+                      >
+                        Individual Consumer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBuyerForm({ ...buyerForm, buyerType: 'BULK_FPO' })}
+                        className={`py-1.5 text-xs font-semibold rounded-lg border transition ${
+                          buyerForm.buyerType === 'BULK_FPO'
+                            ? 'bg-emerald-50 border-emerald-600 text-emerald-900 font-bold'
+                            : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                        }`}
+                      >
+                        Bulk / FPO Buyer
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      {buyerForm.buyerType === 'BULK_FPO' ? 'Contact Person Name *' : 'Full Name *'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Priya Sharma"
+                        value={buyerForm.name}
+                        onChange={(e) => setBuyerForm({ ...buyerForm, name: e.target.value })}
+                        className="w-full pl-9 pr-3 py-2 rounded-xl border border-stone-300 text-sm focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <User className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
+                    </div>
+                  </div>
+
+                  {buyerForm.buyerType === 'BULK_FPO' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">
+                          Org / Company Name *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            required
+                            placeholder="GreenFresh FPO"
+                            value={buyerForm.orgName}
+                            onChange={(e) => setBuyerForm({ ...buyerForm, orgName: e.target.value })}
+                            className="w-full pl-8 pr-2 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <Building2 className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-2.5" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">
+                          GSTIN (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="27AABCG1234F1Z5"
+                          value={buyerForm.gstin}
+                          onChange={(e) => setBuyerForm({ ...buyerForm, gstin: e.target.value })}
+                          className="w-full px-2 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Email Address *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        required
+                        placeholder="buyer@example.com"
+                        value={buyerForm.email}
+                        onChange={(e) => setBuyerForm({ ...buyerForm, email: e.target.value })}
+                        className="w-full pl-9 pr-3 py-2 rounded-xl border border-stone-300 text-sm focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <Mail className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Create Password (min 6 chars) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showBuyerPassword ? 'text' : 'password'}
+                        required
+                        minLength={6}
+                        placeholder="Create strong password"
+                        value={buyerForm.password}
+                        onChange={(e) => setBuyerForm({ ...buyerForm, password: e.target.value })}
+                        className="w-full pl-9 pr-10 py-2 rounded-xl border border-stone-300 text-sm focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <Lock className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
+                      <button
+                        type="button"
+                        onClick={() => setShowBuyerPassword(!showBuyerPassword)}
+                        className="absolute right-3 top-2.5 text-stone-400 hover:text-stone-700"
+                        tabIndex={-1}
+                      >
+                        {showBuyerPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Phone Number *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          placeholder="+91 98200 45678"
+                          value={buyerForm.phone}
+                          onChange={(e) => setBuyerForm({ ...buyerForm, phone: e.target.value })}
+                          className="w-full pl-8 pr-2 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <Phone className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-2.5" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Pincode *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          placeholder="400050"
+                          value={buyerForm.pincode}
+                          onChange={(e) => setBuyerForm({ ...buyerForm, pincode: e.target.value })}
+                          className="w-full pl-8 pr-2 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <MapPin className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-2.5" />
                       </div>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1">
-                      Admin Email
+                      Delivery Address *
                     </label>
-                    <div className="relative">
-                      <input
-                        type="email"
-                        required
-                        placeholder="omsingh203090@gmail.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium"
-                      />
-                      <Mail className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-700 mb-1">
-                      Admin Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        placeholder="Enter password"
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      />
-                      <Lock className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-3 text-stone-400 hover:text-stone-700 transition"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold text-sm shadow-md transition disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <span>Sign In as Admin</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-
-                  <div className="text-center pt-1">
-                    <button
-                      type="button"
-                      onClick={handleRequestOtp}
-                      className="text-xs text-emerald-700 hover:underline font-semibold"
-                    >
-                      Or send 6-digit OTP to admin email
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                /* Farmer & Buyer Real Email OTP Form */
-                <form onSubmit={handleRequestOtp} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-700 mb-1">
-                      {selectedRole === 'farmer' ? 'Farmer Registered Email' : 'Buyer Account Email'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="email"
-                        required
-                        placeholder="your.email@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      />
-                      <Mail className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
-                    </div>
-                    <p className="text-[11px] text-stone-500 mt-1">
-                      {selectedRole === 'farmer'
-                        ? 'Farmers receive a 6-digit verification code to access the harvest management portal.'
-                        : 'Buyers receive a 6-digit verification code to browse lots and place escrow orders.'}
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm shadow-md transition disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <span>Send 6-Digit OTP to Email</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-
-          {/* STEP 2: Segmented OTP Input */}
-          {step === 'otp' && (
-            <div>
-              <div className="text-center mb-5">
-                <p className="text-xs text-stone-500">We sent a 6-digit verification code to</p>
-                <p className="text-sm font-bold text-stone-900">{email}</p>
-              </div>
-
-              <form onSubmit={handleVerifyOtp} className="space-y-5">
-                {/* 6 Segmented Inputs */}
-                <div className="flex justify-between gap-2 max-w-xs mx-auto">
-                  {otpDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => { inputRefs.current[idx] = el; }}
-                      type="text"
-                      maxLength={idx === 0 ? 6 : 1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(idx, e)}
-                      autoFocus={idx === 0}
-                      className="w-11 h-12 text-center text-xl font-extrabold rounded-xl border-2 border-stone-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none bg-stone-50"
-                    />
-                  ))}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading || otpDigits.some((d) => !d)}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm shadow-md transition disabled:opacity-50"
-                >
-                  {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Verify Code & Continue'}
-                </button>
-
-                {/* Resend Cooldown */}
-                <div className="flex items-center justify-between text-xs text-stone-500 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep('email')}
-                    className="hover:text-stone-800"
-                  >
-                    Change email
-                  </button>
-
-                  {cooldown > 0 ? (
-                    <span className="flex items-center gap-1 text-stone-400">
-                      <Clock className="w-3.5 h-3.5" />
-                      Resend code in {cooldown}s
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleRequestOtp()}
-                      className="font-semibold text-emerald-700 hover:underline"
-                    >
-                      Resend OTP
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* STEP 3: Farmer Onboarding */}
-          {step === 'farmer_onboarding' && (
-            <form onSubmit={handleFarmerOnboard} className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
-              <div className="border-b border-stone-200 pb-2 mb-3">
-                <h3 className="font-bold text-sm text-stone-900">Farmer Registration</h3>
-                <p className="text-xs text-stone-500">Provide your farm and payout details</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">Full Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ramesh Kumar"
-                  value={farmerForm.name}
-                  onChange={(e) => setFarmerForm({ ...farmerForm, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm focus:ring-emerald-500 focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">Phone Number *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="+91 98220 12345"
-                    value={farmerForm.phone}
-                    onChange={(e) => setFarmerForm({ ...farmerForm, phone: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">Pincode *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="422202"
-                    value={farmerForm.pincode}
-                    onChange={(e) => setFarmerForm({ ...farmerForm, pincode: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">Village / Taluka *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Dindori"
-                    value={farmerForm.village}
-                    onChange={(e) => setFarmerForm({ ...farmerForm, village: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">District</label>
-                  <input
-                    type="text"
-                    placeholder="Nashik"
-                    value={farmerForm.district}
-                    onChange={(e) => setFarmerForm({ ...farmerForm, district: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">UPI ID or Bank Account for Payouts</label>
-                <input
-                  type="text"
-                  placeholder="ramesh@upi or Bank A/C"
-                  value={farmerForm.upiId}
-                  onChange={(e) => setFarmerForm({ ...farmerForm, upiId: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">Aadhaar Reference (Optional for MVP)</label>
-                <input
-                  type="text"
-                  placeholder="XXXX-XXXX-XXXX (Optional)"
-                  value={farmerForm.aadhaarOptional}
-                  onChange={(e) => setFarmerForm({ ...farmerForm, aadhaarOptional: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full mt-2 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm shadow transition"
-              >
-                {loading ? 'Creating Farmer Account...' : 'Complete Farmer Registration'}
-              </button>
-            </form>
-          )}
-
-          {/* STEP 4: Buyer Onboarding */}
-          {step === 'buyer_onboarding' && (
-            <form onSubmit={handleBuyerOnboard} className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
-              <div className="border-b border-stone-200 pb-2 mb-3">
-                <h3 className="font-bold text-sm text-stone-900">Buyer Registration</h3>
-                <p className="text-xs text-stone-500">Configure your delivery address and buyer type</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">Buyer Type</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setBuyerForm({ ...buyerForm, buyerType: 'INDIVIDUAL' })}
-                    className={`py-2 text-xs font-semibold rounded-lg border ${
-                      buyerForm.buyerType === 'INDIVIDUAL'
-                        ? 'bg-emerald-50 border-emerald-600 text-emerald-900'
-                        : 'border-stone-200 text-stone-600'
-                    }`}
-                  >
-                    Individual Consumer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBuyerForm({ ...buyerForm, buyerType: 'BULK_FPO' })}
-                    className={`py-2 text-xs font-semibold rounded-lg border ${
-                      buyerForm.buyerType === 'BULK_FPO'
-                        ? 'bg-emerald-50 border-emerald-600 text-emerald-900'
-                        : 'border-stone-200 text-stone-600'
-                    }`}
-                  >
-                    Bulk / FPO Buyer
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  {buyerForm.buyerType === 'BULK_FPO' ? 'Contact Person Name *' : 'Full Name *'}
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Priya Sharma"
-                  value={buyerForm.name}
-                  onChange={(e) => setBuyerForm({ ...buyerForm, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                />
-              </div>
-
-              {buyerForm.buyerType === 'BULK_FPO' && (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-700 mb-1">Organization / FPO Name *</label>
                     <input
                       type="text"
                       required
-                      placeholder="GreenFresh Producers Co-op Ltd"
-                      value={buyerForm.orgName}
-                      onChange={(e) => setBuyerForm({ ...buyerForm, orgName: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
+                      placeholder="Flat/Shop, Building, Street, Area"
+                      value={buyerForm.addressLine}
+                      onChange={(e) => setBuyerForm({ ...buyerForm, addressLine: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-700 mb-1">GSTIN (Optional)</label>
-                    <input
-                      type="text"
-                      placeholder="27AABCG1234F1Z5"
-                      value={buyerForm.gstin}
-                      onChange={(e) => setBuyerForm({ ...buyerForm, gstin: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                    />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Mumbai"
+                        value={buyerForm.city}
+                        onChange={(e) => setBuyerForm({ ...buyerForm, city: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        State *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Maharashtra"
+                        value={buyerForm.state}
+                        onChange={(e) => setBuyerForm({ ...buyerForm, state: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
                   </div>
-                </>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full mt-2 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm shadow transition disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Creating Buyer Account...</span>
+                      </span>
+                    ) : (
+                      'Register Buyer & Start Ordering'
+                    )}
+                  </button>
+                </form>
               )}
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">Phone Number *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="+91 98200 45678"
-                    value={buyerForm.phone}
-                    onChange={(e) => setBuyerForm({ ...buyerForm, phone: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">Pincode *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="400050"
-                    value={buyerForm.pincode}
-                    onChange={(e) => setBuyerForm({ ...buyerForm, pincode: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                  />
-                </div>
+              {/* Switch back to Login */}
+              <div className="text-center pt-4 border-t border-stone-100 mt-4">
+                <p className="text-xs text-stone-500">
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setMode('login')}
+                    className="font-bold text-emerald-700 hover:underline inline-flex items-center gap-1 ml-0.5"
+                  >
+                    <span>Sign In here</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </p>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">Delivery Address *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Flat / Building, Street Name, Area"
-                  value={buyerForm.addressLine}
-                  onChange={(e) => setBuyerForm({ ...buyerForm, addressLine: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">City *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Mumbai"
-                    value={buyerForm.city}
-                    onChange={(e) => setBuyerForm({ ...buyerForm, city: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">State *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Maharashtra"
-                    value={buyerForm.state}
-                    onChange={(e) => setBuyerForm({ ...buyerForm, state: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full mt-2 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm shadow transition"
-              >
-                {loading ? 'Setting Up Buyer Account...' : 'Complete Buyer Registration'}
-              </button>
-            </form>
+            </div>
           )}
 
         </div>

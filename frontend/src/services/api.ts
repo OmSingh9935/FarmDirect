@@ -37,10 +37,28 @@ export const api = {
       body: JSON.stringify({ email, code }),
     }),
 
-  loginWithPassword: (email: string, password: string) =>
-    request<{ user: any; token: string }>('/auth/login-password', {
+  login: (email: string, password: string) =>
+    request<{ user: any; token: string }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    }),
+
+  loginWithPassword: (email: string, password: string) =>
+    request<{ user: any; token: string }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+
+  registerFarmer: (data: any) =>
+    request<{ user: any; token: string }>('/auth/register/farmer', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  registerBuyer: (data: any) =>
+    request<{ user: any; token: string }>('/auth/register/buyer', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 
   completeFarmerOnboarding: (data: any) =>

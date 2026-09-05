@@ -152,6 +152,7 @@ async function main() {
   }
 
   console.log('👨‍🌾 Seeding 15 Farmers with Regional Profiles & Bank Accounts...');
+  const defaultUserPassword = await bcrypt.hash('FarmDirect@123', 10);
   const farmersList = [
     { name: 'Ramesh Kumar', email: 'ramesh.farmer@farmdirect.test', phone: '+91 98220 44551', village: 'Dindori', district: 'Nashik', state: 'Maharashtra', pin: '422202', upi: 'ramesh.kumar@okhdfcbank', lang: 'mr' },
     { name: 'Balwinder Singh', email: 'balwinder.singh@farmdirect.test', phone: '+91 98140 12345', village: 'Taraori', district: 'Karnal', state: 'Haryana', pin: '132116', upi: 'balwinder.grain@paytm', lang: 'en' },
@@ -178,6 +179,7 @@ async function main() {
         email: f.email,
         phone: f.phone,
         role: 'farmer',
+        password: defaultUserPassword,
         farmerProfile: {
           create: {
             village: f.village,
@@ -219,6 +221,7 @@ async function main() {
         email: b.email,
         phone: b.phone,
         role: 'buyer',
+        password: defaultUserPassword,
         buyerProfile: {
           create: {
             buyerType: b.type,
