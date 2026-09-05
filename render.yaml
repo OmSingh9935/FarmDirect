@@ -1,13 +1,16 @@
-﻿services:
+services:
   - type: web
     name: farmdirect
     runtime: node
     plan: free
+    region: oregon
     buildCommand: npm run render-build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
       - key: DATABASE_URL
         value: "file:./dev.db"
       - key: JWT_SECRET
