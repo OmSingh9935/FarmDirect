@@ -35,18 +35,15 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, openV
         <div className="flex items-center justify-between h-16 gap-4">
           
           {/* Logo and Brand */}
-          <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => setCurrentTab(role === 'hub_admin' ? 'hub-analytics' : role === 'farmer' ? 'farmer-dash' : 'home')}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center text-white shadow-md shadow-emerald-700/20">
-              <Wheat className="w-6 h-6 text-emerald-100" />
-            </div>
-            <div>
-              <span className="text-xl font-extrabold tracking-tight text-emerald-950 flex items-center gap-1">
-                Farm<span className="text-emerald-600">Direct</span>
-              </span>
-              <span className="hidden sm:block text-[10px] tracking-wider uppercase font-semibold text-stone-500">
-                Direct Harvest & Escrow
-              </span>
-            </div>
+          <div
+            className="flex items-center cursor-pointer shrink-0 py-1"
+            onClick={() => setCurrentTab(role === 'hub_admin' ? 'hub-analytics' : role === 'farmer' ? 'farmer-dash' : 'home')}
+          >
+            <img
+              src="/logo.png"
+              alt="Farm Direct — Direct Harvest & Escrow"
+              className="h-10 sm:h-11 w-auto object-contain transition hover:opacity-95"
+            />
           </div>
 
           {/* Role-Specific Navigation Links */}

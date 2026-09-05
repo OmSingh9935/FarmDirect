@@ -221,11 +221,15 @@ export const AuthModal: React.FC = () => {
             <X className="w-5 h-5" />
           </button>
 
-          <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mx-auto mb-3 border border-white/20">
-            <Wheat className="w-7 h-7 text-emerald-300" />
+          <div className="inline-block bg-white rounded-2xl px-4 py-2.5 shadow-lg mx-auto mb-3 border border-white/40">
+            <img
+              src="/logo.png"
+              alt="Farm Direct — Direct Harvest & Escrow"
+              className="h-9 sm:h-10 w-auto object-contain mx-auto"
+            />
           </div>
-          <h2 className="text-xl font-extrabold tracking-tight">FarmDirect Authentication</h2>
-          <p className="text-xs text-emerald-200 mt-1">Direct Farmer-to-Buyer Marketplace with Escrow</p>
+          <h2 className="text-lg font-black tracking-tight text-white">Secure Portal Access</h2>
+          <p className="text-xs text-emerald-200 mt-0.5">DIRECT HARVEST & ESCROW</p>
         </div>
 
         {/* Modal Body */}

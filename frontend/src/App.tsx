@@ -112,17 +112,22 @@ const MainApp: React.FC = () => {
 
       {/* Footer */}
       <footer className="bg-stone-900 text-stone-400 py-10 text-xs border-t border-stone-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
           <div>
-            <div className="text-white font-extrabold text-sm flex items-center justify-center sm:justify-start gap-1">
-              🌱 Farm<span className="text-emerald-500">Direct</span> Marketplace
+            <div className="inline-block bg-white/95 rounded-xl px-3 py-1.5 shadow-sm mb-2">
+              <img
+                src="/logo.png"
+                alt="Farm Direct — Direct Harvest & Escrow"
+                className="h-8 w-auto object-contain"
+              />
             </div>
-            <p className="text-stone-500 text-[11px] mt-1">
+            <p className="text-stone-400 text-xs mt-0.5 max-w-md">
               Direct Farmer-to-Buyer Marketplace with Escrow & Central Hub Logistics.
             </p>
           </div>
-          <div className="text-[11px] text-stone-500">
-            Node.js • Express • Prisma ORM (SQLite/Postgres) • React • Tailwind CSS
+          <div className="text-[11px] text-stone-500 space-y-1 sm:text-right">
+            <div>© {new Date().getFullYear()} Farm Direct • Direct Harvest & Escrow</div>
+            <div>Node.js • Express • Prisma ORM (SQLite/Postgres) • React • Tailwind CSS</div>
           </div>
         </div>
       </footer>

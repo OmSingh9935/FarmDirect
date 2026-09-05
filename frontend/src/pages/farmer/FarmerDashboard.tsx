@@ -48,7 +48,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ onNavigate, op
       <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-950 rounded-3xl p-6 sm:p-8 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl relative overflow-hidden">
         <div className="relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-xs font-semibold mb-2">
-            <Wheat className="w-3.5 h-3.5" />
+            <img src="/emblem.png" alt="Farm Direct" className="w-4 h-4 object-contain" />
             <span>Kisan Dashboard • {user?.farmerProfile?.village || 'Nashik'}, {user?.farmerProfile?.district || 'MH'}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">

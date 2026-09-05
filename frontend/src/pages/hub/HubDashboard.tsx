@@ -319,7 +319,7 @@ export const HubDashboard: React.FC<HubDashboardProps> = ({ initialSubtab = 'ana
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-stone-200">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold mb-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+            <img src="/emblem.png" alt="Farm Direct" className="w-4 h-4 object-contain" />
             <span>Central Agricultural Logistics Hub & Marketplace Administration</span>
           </div>
           <h1 className="text-2xl font-extrabold text-stone-900 tracking-tight">
