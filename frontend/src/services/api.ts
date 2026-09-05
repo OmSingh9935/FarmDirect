@@ -37,6 +37,12 @@ export const api = {
       body: JSON.stringify({ email, code }),
     }),
 
+  loginWithPassword: (email: string, password: string) =>
+    request<{ user: any; token: string }>('/auth/login-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+
   completeFarmerOnboarding: (data: any) =>
     request<{ user: any; token: string }>('/auth/onboard/farmer', {
       method: 'POST',

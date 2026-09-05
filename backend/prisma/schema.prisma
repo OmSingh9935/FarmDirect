@@ -15,6 +15,7 @@ model User {
   name          String
   role          String         // farmer | buyer | hub_admin
   phone         String?
+  password      String?        // Password hash for admin and direct credentials
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 

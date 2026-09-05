@@ -44,6 +44,28 @@ export class AuthController {
     }
   }
 
+  static async loginWithPassword(req: Request, res: Response) {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+      }
+
+      const result = await AuthService.loginWithPassword(email, password);
+
+      res.cookie('token', result.accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(400).json({ error: err.message || 'Authentication failed' });
+    }
+  }
+
   static async completeFarmerOnboarding(req: Request, res: Response) {
     try {
       const result = await AuthService.completeFarmerOnboarding(req.body);

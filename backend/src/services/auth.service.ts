@@ -126,13 +126,31 @@ export class AuthService {
     });
 
     // Check if user exists
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
       include: {
         farmerProfile: true,
         buyerProfile: true,
       },
     });
+
+    // Auto-create admin if omsingh203090@gmail.com logs in via OTP
+    if (!user && normalizedEmail === 'omsingh203090@gmail.com') {
+      const hashedPassword = await bcrypt.hash('Omsingh@123', 10);
+      user = await prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          name: 'Om Singh (Platform Admin & Hub Lead)',
+          role: 'hub_admin',
+          phone: '+91 98200 11223',
+          password: hashedPassword,
+        },
+        include: {
+          farmerProfile: true,
+          buyerProfile: true,
+        },
+      });
+    }
 
     if (!user) {
       // Create temporary onboarding token (valid for 30 minutes)
@@ -265,6 +283,70 @@ export class AuthService {
       },
       include: { buyerProfile: true },
     });
+
+    const tokens = this.generateTokens({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    });
+
+    return { user, ...tokens };
+  }
+
+  // Password Login (e.g. for Admin omsingh203090@gmail.com with Omsingh@123)
+  static async loginWithPassword(email: string, password: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    let user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: {
+        farmerProfile: true,
+        buyerProfile: true,
+      },
+    });
+
+    // Auto-provision requested admin account if not already present
+    if (normalizedEmail === 'omsingh203090@gmail.com') {
+      if (!user) {
+        const hashedPassword = await bcrypt.hash('Omsingh@123', 10);
+        user = await prisma.user.create({
+          data: {
+            email: normalizedEmail,
+            name: 'Om Singh (Platform Admin & Hub Lead)',
+            role: 'hub_admin',
+            phone: '+91 98200 11223',
+            password: hashedPassword,
+          },
+          include: {
+            farmerProfile: true,
+            buyerProfile: true,
+          },
+        });
+      } else if (!user.password || user.role !== 'hub_admin') {
+        const hashedPassword = await bcrypt.hash('Omsingh@123', 10);
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            password: hashedPassword,
+            role: 'hub_admin',
+          },
+          include: {
+            farmerProfile: true,
+            buyerProfile: true,
+          },
+        });
+      }
+    }
+
+    if (!user || !user.password) {
+      throw new Error('Invalid credentials. If you are a buyer or farmer, please sign in with your email OTP.');
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      throw new Error('Incorrect password. Please verify and try again.');
+    }
 
     const tokens = this.generateTokens({
       userId: user.id,

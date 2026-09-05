@@ -20,25 +20,42 @@ export class NodemailerEmailService implements EmailService {
   private provider: string;
 
   constructor() {
-    this.provider = process.env.EMAIL_PROVIDER || 'console';
+    this.provider = process.env.EMAIL_PROVIDER || (process.env.SMTP_USER || process.env.GMAIL_USER ? 'smtp' : 'console');
 
-    if (this.provider === 'smtp' && process.env.SMTP_HOST) {
-      this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: process.env.SMTP_PORT === '465',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
+    const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+    const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+    const smtpHost = process.env.SMTP_HOST;
+
+    if (smtpUser && smtpPass) {
+      if (smtpHost) {
+        this.transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: parseInt(process.env.SMTP_PORT || '587', 10),
+          secure: process.env.SMTP_PORT === '465' || process.env.SMTP_SECURE === 'true',
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+        });
+      } else {
+        // Default to Gmail service if user/pass provided without custom host
+        this.transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+        });
+      }
+      console.log(`[EmailService] Transporter initialized for ${smtpUser}`);
     }
   }
 
   async sendEmail(options: SendEmailOptions): Promise<boolean> {
-    const from = process.env.SMTP_FROM || 'FarmDirect <noreply@farmdirect.market>';
+    const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+    const from = process.env.SMTP_FROM || (smtpUser ? `FarmDirect <${smtpUser}>` : 'FarmDirect <noreply@farmdirect.market>');
 
-    if (this.transporter && this.provider === 'smtp') {
+    if (this.transporter) {
       try {
         await this.transporter.sendMail({
           from,
@@ -47,10 +64,10 @@ export class NodemailerEmailService implements EmailService {
           text: options.text,
           html: options.html,
         });
-        console.log(`[EmailService] SMTP email sent to ${options.to}: ${options.subject}`);
+        console.log(`[EmailService] ✅ Real email sent to ${options.to}: ${options.subject}`);
         return true;
       } catch (err) {
-        console.error('[EmailService] Failed to send SMTP email:', err);
+        console.error('[EmailService] ❌ Failed to send SMTP email:', err);
       }
     }
 

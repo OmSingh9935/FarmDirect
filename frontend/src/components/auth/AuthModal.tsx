@@ -1,21 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Wheat, ShoppingBag, ArrowRight, CheckCircle2, ShieldCheck, Mail, Clock, RefreshCw } from 'lucide-react';
+import { X, Wheat, ShoppingBag, ArrowRight, CheckCircle2, ShieldCheck, Mail, Clock, RefreshCw, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
 import { useToast } from '../../context/ToastContext.js';
 import api from '../../services/api.js';
 import { UserRole } from '../../types/index.js';
 
 export const AuthModal: React.FC = () => {
-  const { isAuthModalOpen, closeAuthModal, authModalRole, loginWithUser, demoLogin } = useAuth();
+  const { isAuthModalOpen, closeAuthModal, authModalRole, loginWithUser } = useAuth();
   const { success, error: toastError } = useToast();
 
   const [selectedRole, setSelectedRole] = useState<UserRole>(authModalRole || 'buyer');
   const [step, setStep] = useState<'email' | 'otp' | 'farmer_onboarding' | 'buyer_onboarding'>('email');
   const [email, setEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('Omsingh@123');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [onboardingToken, setOnboardingToken] = useState('');
-  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
 
   // 6 segmented OTP inputs
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
@@ -50,6 +51,10 @@ export const AuthModal: React.FC = () => {
 
   useEffect(() => {
     setSelectedRole(authModalRole);
+    if (authModalRole === 'hub_admin') {
+      setEmail('omsingh203090@gmail.com');
+      setAdminPassword('Omsingh@123');
+    }
   }, [authModalRole]);
 
   // Cooldown countdown timer
@@ -62,7 +67,7 @@ export const AuthModal: React.FC = () => {
 
   if (!isAuthModalOpen) return null;
 
-  // 1. Request OTP
+  // 1. Request Real OTP
   const handleRequestOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!email || !email.includes('@')) {
@@ -71,24 +76,38 @@ export const AuthModal: React.FC = () => {
     }
 
     setLoading(true);
-    setDevOtpHint(null);
     try {
       const res = await api.requestOtp(email, selectedRole);
       setCooldown(res.cooldown || 60);
       setStep('otp');
-      success('Verification Code Sent', res.message);
-
-      // Check for dev OTP helper
-      setTimeout(async () => {
-        try {
-          const devRes = await api.getDevOtp(email);
-          if (devRes.otp) setDevOtpHint(devRes.otp);
-        } catch {
-          // ignore
-        }
-      }, 500);
+      success('Verification Code Dispatched', res.message);
     } catch (err: any) {
       toastError('OTP Request Failed', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 1b. Direct Admin Password Login
+  const handlePasswordLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!email || !email.includes('@')) {
+      toastError('Invalid Email', 'Please enter your admin email address');
+      return;
+    }
+    if (!adminPassword) {
+      toastError('Missing Password', 'Please enter your admin password');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.loginWithPassword(email, adminPassword);
+      loginWithUser(res.user);
+      success('Admin Authenticated', `Welcome back, ${res.user.name}`);
+      closeAuthModal();
+    } catch (err: any) {
+      toastError('Authentication Failed', err.message);
     } finally {
       setLoading(false);
     }
@@ -241,103 +260,179 @@ export const AuthModal: React.FC = () => {
               {/* Role Toggle */}
               <div className="mb-5">
                 <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">
-                  Select Your Role
+                  Select Portal Role
                 </label>
-                <div className="grid grid-cols-2 gap-2 p-1 bg-stone-100 rounded-xl">
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-stone-100 rounded-xl">
                   <button
                     type="button"
-                    onClick={() => setSelectedRole('farmer')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition ${
-                      selectedRole === 'farmer'
-                        ? 'bg-white text-emerald-900 shadow-sm'
-                        : 'text-stone-600 hover:text-stone-900'
-                    }`}
-                  >
-                    <Wheat className="w-4 h-4 text-emerald-600" />
-                    I'm a Farmer
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('buyer')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition ${
+                    onClick={() => {
+                      setSelectedRole('buyer');
+                      if (email === 'omsingh203090@gmail.com') setEmail('');
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition ${
                       selectedRole === 'buyer'
                         ? 'bg-white text-emerald-900 shadow-sm'
                         : 'text-stone-600 hover:text-stone-900'
                     }`}
                   >
-                    <ShoppingBag className="w-4 h-4 text-sky-600" />
-                    I'm a Buyer
-                  </button>
-                </div>
-              </div>
-
-              <form onSubmit={handleRequestOtp} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      required
-                      placeholder="your.email@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    />
-                    <Mail className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm shadow-md transition disabled:opacity-50"
-                >
-                  {loading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <span>Send 6-Digit OTP</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* Instant Demo Login Divider */}
-              <div className="mt-6 pt-5 border-t border-stone-200">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-stone-400 text-center mb-3">
-                  Or Test Instantly with Demo Profiles
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => demoLogin('farmer')}
-                    className="p-2 rounded-lg border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/70 text-emerald-900 text-xs font-semibold flex flex-col items-center gap-1 transition"
-                  >
-                    <Wheat className="w-4 h-4 text-emerald-600" />
-                    <span>Farmer</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => demoLogin('buyer')}
-                    className="p-2 rounded-lg border border-sky-200 bg-sky-50/50 hover:bg-sky-100/70 text-sky-900 text-xs font-semibold flex flex-col items-center gap-1 transition"
-                  >
-                    <ShoppingBag className="w-4 h-4 text-sky-600" />
+                    <ShoppingBag className="w-3.5 h-3.5 text-sky-600" />
                     <span>Buyer</span>
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => demoLogin('hub_admin')}
-                    className="p-2 rounded-lg border border-amber-200 bg-amber-50/50 hover:bg-amber-100/70 text-amber-900 text-xs font-semibold flex flex-col items-center gap-1 transition"
+                    onClick={() => {
+                      setSelectedRole('farmer');
+                      if (email === 'omsingh203090@gmail.com') setEmail('');
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition ${
+                      selectedRole === 'farmer'
+                        ? 'bg-white text-emerald-900 shadow-sm'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
                   >
-                    <ShieldCheck className="w-4 h-4 text-amber-600" />
-                    <span>Hub Staff</span>
+                    <Wheat className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Farmer</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRole('hub_admin');
+                      setEmail('omsingh203090@gmail.com');
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition ${
+                      selectedRole === 'hub_admin'
+                        ? 'bg-white text-emerald-900 shadow-sm'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Admin</span>
                   </button>
                 </div>
               </div>
+
+              {selectedRole === 'hub_admin' ? (
+                /* Admin Direct Password Login Form */
+                <form onSubmit={handlePasswordLogin} className="space-y-4">
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 text-xs flex items-start gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold text-amber-900">Admin Control Portal</div>
+                      <div className="text-[11px] text-stone-600 mt-0.5">
+                        Log in with your administrator credentials to access real user data, analytics, intake, and disputes.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Admin Email
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        required
+                        placeholder="omsingh203090@gmail.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium"
+                      />
+                      <Mail className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Admin Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Enter password"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                      <Lock className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-stone-400 hover:text-stone-700 transition"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold text-sm shadow-md transition disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <span>Sign In as Admin</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="text-center pt-1">
+                    <button
+                      type="button"
+                      onClick={handleRequestOtp}
+                      className="text-xs text-emerald-700 hover:underline font-semibold"
+                    >
+                      Or send 6-digit OTP to admin email
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* Farmer & Buyer Real Email OTP Form */
+                <form onSubmit={handleRequestOtp} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      {selectedRole === 'farmer' ? 'Farmer Registered Email' : 'Buyer Account Email'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        required
+                        placeholder="your.email@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                      <Mail className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
+                    </div>
+                    <p className="text-[11px] text-stone-500 mt-1">
+                      {selectedRole === 'farmer'
+                        ? 'Farmers receive a 6-digit verification code to access the harvest management portal.'
+                        : 'Buyers receive a 6-digit verification code to browse lots and place escrow orders.'}
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm shadow-md transition disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <span>Send 6-Digit OTP to Email</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
             </div>
           )}
 
@@ -348,26 +443,6 @@ export const AuthModal: React.FC = () => {
                 <p className="text-xs text-stone-500">We sent a 6-digit verification code to</p>
                 <p className="text-sm font-bold text-stone-900">{email}</p>
               </div>
-
-              {/* Dev OTP Helper Banner */}
-              {devOtpHint && (
-                <div className="mb-4 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold">Local Dev Code: </span>
-                    <span className="font-mono font-bold tracking-widest text-sm text-emerald-700">{devOtpHint}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const chars = devOtpHint.split('');
-                      setOtpDigits(chars);
-                    }}
-                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold"
-                  >
-                    Fill Code
-                  </button>
-                </div>
-              )}
 
               <form onSubmit={handleVerifyOtp} className="space-y-5">
                 {/* 6 Segmented Inputs */}

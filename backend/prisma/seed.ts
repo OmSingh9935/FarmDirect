@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -20,13 +21,15 @@ async function main() {
   await prisma.buyerProfile.deleteMany();
   await prisma.user.deleteMany();
 
-  console.log('🏛️ Creating Hub Operations Admin...');
+  console.log('🏛️ Creating Hub Operations Admin (Om Singh)...');
+  const adminPasswordHash = await bcrypt.hash('Omsingh@123', 10);
   const adminUser = await prisma.user.create({
     data: {
-      email: 'rajesh.admin@farmdirect.test',
-      name: 'Rajesh Verma (Hub Operations Lead)',
+      email: 'omsingh203090@gmail.com',
+      name: 'Om Singh (Platform Admin & Hub Lead)',
       role: 'hub_admin',
       phone: '+91 98200 11223',
+      password: adminPasswordHash,
     },
   });
 
