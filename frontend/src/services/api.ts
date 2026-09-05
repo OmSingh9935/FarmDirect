@@ -111,6 +111,24 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  aiGradeImage: (data: { imageBase64: string; mimeType?: string; cropName?: string; notes?: string }) =>
+    request<{
+      aiGrade: 'A' | 'B' | 'C';
+      aiConfidence: number;
+      aiTips: string;
+      attributes: {
+        colorUniformity: number;
+        surfaceTexture: number;
+        blemishScore: number;
+        freshnessIndex: number;
+      };
+      detectedCrop?: string;
+      provider: 'gemini' | 'heuristic';
+    }>('/listings/ai-grade-image', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   // Orders
   createOrder: (data: { items: { listingId: string; quantity: number }[]; deliveryAddress?: string; deliveryPincode?: string }) =>
     request<{ message: string; orders: any[] }>('/orders', {

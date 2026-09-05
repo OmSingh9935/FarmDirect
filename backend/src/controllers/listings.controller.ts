@@ -185,40 +185,98 @@ export class ListingsController {
     }
   }
 
-  // Create listing with AI pre-grading
+  // Create listing with AI pre-grading & custom crop variety support
   static async createListing(req: AuthenticatedRequest, res: Response) {
     try {
       if (!req.user || req.user.role !== 'farmer') {
         return res.status(403).json({ error: 'Only registered farmers can post listings' });
       }
 
-      const { cropId, quantity, unit = 'kg', pricePerUnit, harvestDate, photos, notes, farmLocation } = req.body;
+      let {
+        cropId,
+        customCropName,
+        customCropCategory,
+        quantity,
+        unit = 'kg',
+        pricePerUnit,
+        harvestDate,
+        photos,
+        notes,
+        farmLocation,
+        aiGrade: clientGrade,
+        aiConfidence: clientConfidence,
+        aiTips: clientTips,
+      } = req.body;
 
-      if (!cropId || !quantity || !pricePerUnit || !harvestDate) {
-        return res.status(400).json({ error: 'Missing required listing parameters' });
+      if ((!cropId || cropId === '__custom__') && !customCropName) {
+        return res.status(400).json({ error: 'Please select a crop variety or enter your custom crop name' });
+      }
+      if (!quantity || !pricePerUnit || !harvestDate) {
+        return res.status(400).json({ error: 'Missing required listing parameters (quantity, price, harvest date)' });
       }
 
-      const crop = await prisma.crop.findUnique({ where: { id: cropId } });
-      if (!crop) return res.status(404).json({ error: 'Crop not found' });
+      let resolvedCrop: any = null;
 
-      // Run AI Pre-Grade Heuristic
+      if (cropId && cropId !== '__custom__') {
+        resolvedCrop = await prisma.crop.findUnique({ where: { id: cropId } });
+      }
+
+      // If custom crop variety was provided by farmer
+      if (!resolvedCrop && customCropName) {
+        const trimmedName = customCropName.trim();
+        resolvedCrop = await prisma.crop.findFirst({ where: { name: { equals: trimmedName } } });
+
+        if (!resolvedCrop) {
+          resolvedCrop = await prisma.crop.create({
+            data: {
+              name: trimmedName,
+              category: customCropCategory || 'Vegetables',
+              unit,
+              basePricePerKg: parseFloat(pricePerUnit) || 30.0,
+              description: `Farmer registered custom variety: ${trimmedName}`,
+              threshold: {
+                create: {
+                  quintalEquivalentThreshold: 0.5,
+                  commissionPercentage: 5.0,
+                },
+              },
+            },
+          });
+        }
+      }
+
+      if (!resolvedCrop) {
+        return res.status(400).json({ error: 'Invalid crop selected. Please choose an existing crop or specify a custom name.' });
+      }
+
       const photoList = Array.isArray(photos) ? photos : [photos || '/sample_crop.jpg'];
-      const preGrade = GradingService.evaluatePreGrade(crop.name, notes, photoList.length);
+
+      // If Gemini AI pre-grade was already generated on image upload, use it
+      let aiGrade = clientGrade || 'A';
+      let aiConfidence = clientConfidence ? parseFloat(clientConfidence) : 0.94;
+      let aiTips = clientTips || null;
+
+      if (!clientGrade) {
+        const preGrade = GradingService.evaluatePreGrade(resolvedCrop.name, notes, photoList.length);
+        aiGrade = preGrade.aiGrade;
+        aiConfidence = preGrade.aiConfidence;
+        aiTips = preGrade.aiTips;
+      }
 
       const listing = await prisma.listing.create({
         data: {
           farmerId: req.user.userId,
-          cropId,
+          cropId: resolvedCrop.id,
           quantity: parseFloat(quantity),
           unit,
           pricePerUnit: parseFloat(pricePerUnit),
           harvestDate: new Date(harvestDate),
-          aiGrade: preGrade.aiGrade,
-          aiConfidence: preGrade.aiConfidence,
-          aiTips: preGrade.aiTips,
+          aiGrade,
+          aiConfidence,
+          aiTips,
           status: 'ACTIVE',
           photos: JSON.stringify(photoList),
-          notes: notes || '',
+          notes: notes || `Direct farm harvest from ${farmLocation || 'farm gate'}.`,
           farmLocation: farmLocation || 'Farm Gate',
         },
         include: {
@@ -227,11 +285,11 @@ export class ListingsController {
       });
 
       return res.status(201).json({
-        message: 'Listing created successfully with AI Pre-Grade certification',
+        message: 'Produce lot listed successfully on marketplace',
         listing: {
           ...listing,
           photos: photoList,
-          preGrade,
+          preGrade: { aiGrade, aiConfidence, aiTips },
         },
       });
     } catch (err: any) {
@@ -295,6 +353,21 @@ export class ListingsController {
       return res.json(result);
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
+    }
+  }
+
+  // Multimodal Gemini AI Produce Quality & Grading Inspector
+  static async aiGradeImage(req: Request, res: Response) {
+    try {
+      const { imageBase64, mimeType, cropName, notes } = req.body;
+      if (!imageBase64) {
+        return res.status(400).json({ error: 'Produce image is required for AI grade inspection' });
+      }
+
+      const result = await GradingService.analyzeImageWithGemini(imageBase64, mimeType, cropName, notes);
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'AI Grading failed' });
     }
   }
 }
