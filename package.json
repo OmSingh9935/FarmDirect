@@ -9,6 +9,8 @@
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "start": "node backend/dist/server.js",
+    "render-build": "npm --prefix backend install && npm --prefix frontend install && npm run build && npm run seed",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down"
   },

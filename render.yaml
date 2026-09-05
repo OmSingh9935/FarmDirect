@@ -1,0 +1,28 @@
+﻿services:
+  - type: web
+    name: farmdirect
+    runtime: node
+    plan: free
+    buildCommand: npm run render-build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: "file:./dev.db"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 1h
+      - key: REFRESH_TOKEN_EXPIRES_DAYS
+        value: "7"
+      - key: RAZORPAY_KEY_ID
+        value: rzp_test_farmdirect12345
+      - key: RAZORPAY_KEY_SECRET
+        value: secret_test_farmdirect67890
+      - key: RAZORPAY_WEBHOOK_SECRET
+        value: webhook_secret_farmdirect
+      - key: DEFAULT_COMMISSION_PERCENTAGE
+        value: "5.0"
+      - key: DEFAULT_QUINTAL_THRESHOLD
+        value: "0.5"
