@@ -524,36 +524,6 @@ export class AuthService {
     const refreshToken = jwt.sign({ userId: payload.userId }, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
     return { accessToken, refreshToken };
   }
-
-  // Instant Demo Switcher login
-  static async loginAsDemo(role: 'farmer' | 'buyer' | 'hub_admin' | 'bulk_buyer') {
-    let email = '';
-    if (role === 'farmer') email = 'ramesh.farmer@farmdirect.test';
-    else if (role === 'buyer') email = 'priya.buyer@farmdirect.test';
-    else if (role === 'bulk_buyer') email = 'greenfresh.fpo@farmdirect.test';
-    else if (role === 'hub_admin') email = 'rajesh.admin@farmdirect.test';
-
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: {
-        farmerProfile: true,
-        buyerProfile: true,
-      },
-    });
-
-    if (!user) {
-      throw new Error(`Demo account for ${role} not found. Please run seed script first.`);
-    }
-
-    const tokens = this.generateTokens({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      name: user.name,
-    });
-
-    return { user, ...tokens };
-  }
 }
 
 export default AuthService;

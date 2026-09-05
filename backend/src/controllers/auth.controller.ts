@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import AuthService from '../services/auth.service.js';
-import { devOtpStore } from '../services/email.service.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import prisma from '../prisma.js';
 
@@ -168,36 +167,6 @@ export class AuthController {
   static async logout(req: Request, res: Response) {
     res.clearCookie('token');
     return res.json({ success: true, message: 'Logged out successfully' });
-  }
-
-  static async demoLogin(req: Request, res: Response) {
-    try {
-      const { role } = req.body;
-      const result = await AuthService.loginAsDemo(role);
-
-      res.cookie('token', result.accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
-
-      return res.json(result);
-    } catch (err: any) {
-      return res.status(400).json({ error: err.message || 'Demo login failed' });
-    }
-  }
-
-  // Developer preview helper to retrieve the last sent OTP in development
-  static async getDevOtp(req: Request, res: Response) {
-    const email = (req.query.email as string)?.toLowerCase();
-    if (!email) return res.json({ otp: null });
-    const cached = devOtpStore.get(email);
-    return res.json({
-      email,
-      otp: cached ? cached.code : null,
-      sentAt: cached ? cached.sentAt : null,
-    });
   }
 }
 

@@ -73,14 +73,6 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  demoLogin: (role: string) =>
-    request<{ user: any; token?: string; accessToken?: string }>('/auth/demo-login', {
-      method: 'POST',
-      body: JSON.stringify({ role }),
-    }),
-
-  getDevOtp: (email: string) =>
-    request<{ email: string; otp: string | null }>('/auth/dev-otp?email=' + encodeURIComponent(email)),
 
   me: () => request<{ user: any }>('/auth/me'),
 

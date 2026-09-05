@@ -13,7 +13,6 @@ interface AuthContextType {
   setRole: (role: UserRole) => void;
   loginWithUser: (user: User) => void;
   logout: () => Promise<void>;
-  demoLogin: (role: string) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -75,21 +74,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRoleState('buyer');
   };
 
-  const demoLogin = async (demoRole: string) => {
-    setLoading(true);
-    try {
-      const res = await api.demoLogin(demoRole);
-      setUser(res.user);
-      setRoleState(res.user.role as UserRole);
-      setIsAuthModalOpen(false);
-    } catch (err: any) {
-      console.error(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -103,7 +87,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setRole,
         loginWithUser,
         logout,
-        demoLogin,
         refreshUser,
       }}
     >
